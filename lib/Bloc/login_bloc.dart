@@ -51,25 +51,33 @@ class LoginFailure extends LoginState {
 
 // BLoC
 class LoginBloc extends Bloc<LoginEvent, LoginState> {
-  final AuthLogin _authLogin = AuthLogin(); // Add this line
+  final AuthLogin _authLogin = AuthLogin();
 
   LoginBloc() : super(LoginInitial()) {
     on<LoginSubmitted>(_onLoginSubmitted);
   }
 
-  Future<void> _onLoginSubmitted(LoginSubmitted event, Emitter<LoginState> emit) async {
-    emit(LoginLoading());
-    try {
-      final user = User(username: event.username, password: event.password); // Update to use the new User model
-      final success = await _authLogin.login(user); // Use AuthLogin repository
-
-      if (success) {
-        emit(LoginSuccess());
-      } else {
-        emit(LoginFailure('Login failed'));
-      }
-    } catch (e) {
-      emit(LoginFailure(e.toString()));
+Future<void> _onLoginSubmitted(LoginSubmitted event, Emitter<LoginState> emit) async {
+  emit(LoginLoading());
+  try {
+    print("Đang đăng nhập với username: ${event.username}, password: ${event.password}");
+    
+    final user = User(username: event.username, password: event.password);
+    final success = await _authLogin.login(user);
+    
+    print("Kết quả từ AuthLogin: $success");
+    
+    if (success) {
+      print("Đăng nhập thành công");
+      emit(LoginSuccess());
+    } else {
+      print("Đăng nhập thất bại từ server");
+      emit(LoginFailure('Tên đăng nhập hoặc mật khẩu không đúng'));
     }
+  } catch (e) {
+    print("Lỗi chi tiết: ${e.toString()}");
+    emit(LoginFailure('Đã có lỗi xảy ra: ${e.toString()}'));
   }
+}
+
 }

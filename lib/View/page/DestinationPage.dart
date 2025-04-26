@@ -1,3 +1,5 @@
+import 'package:doanngon/View/page/BookingNowPage.dart';
+import 'package:doanngon/View/page/MapScreen.dart';
 import 'package:doanngon/View/page/TourSchedulePage.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -17,7 +19,7 @@ class _DestinationDetailPageState extends State<DestinationDetailPage> {
   @override
   void initState() {
     super.initState();
-    initialImage = widget.destination["image"];
+    initialImage = widget.destination["image"] ?? AssetImage('assets/default_image.png');
   }
 
   @override
@@ -31,7 +33,7 @@ class _DestinationDetailPageState extends State<DestinationDetailPage> {
             right: 0,
             child: Image(
               image: widget.destination["image"] ?? AssetImage('assets/default_image.png'),
-              height: MediaQuery.of(context).size.height / 2, // Adjust height to half of the screen
+              height: MediaQuery.of(context).size.height / 2,
               width: double.infinity,
               fit: BoxFit.cover,
             ),
@@ -53,8 +55,15 @@ class _DestinationDetailPageState extends State<DestinationDetailPage> {
             child: CircleAvatar(
               backgroundColor: Colors.black26,
               child: IconButton(
-                icon: Icon(Icons.bookmark_border, color: Colors.white),
-                onPressed: () {},
+                icon: Icon(Icons.map_outlined, color: Colors.white),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => Mapscreen(destination: widget.destination),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -88,7 +97,7 @@ class _DestinationDetailPageState extends State<DestinationDetailPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    widget.destination["title"] ?? "Unknown Title",
+                                    widget.destination["title"] ?? widget.destination["name"] ?? "Unknown Title",
                                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                                   ),
                                   SizedBox(height: 4),
@@ -96,15 +105,15 @@ class _DestinationDetailPageState extends State<DestinationDetailPage> {
                                     children: [
                                       Icon(Icons.location_on, size: 16, color: Colors.grey),
                                       SizedBox(width: 4),
-                                      Text(widget.destination["location"] ?? "Unknown Location",
-                                          style: TextStyle(fontSize: 14, color: Colors.grey)),
+                                      Text(
+                                        widget.destination["location"] ?? widget.destination["destination"] ?? "Unknown Location",
+                                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                                      ),
                                     ],
                                   ),
                                 ],
                               ),
-                              CircleAvatar(
-                                backgroundImage: AssetImage("assets/avatar.png"),
-                              ),
+                              CircleAvatar(),
                             ],
                           ),
                           SizedBox(height: 20),
@@ -114,7 +123,6 @@ class _DestinationDetailPageState extends State<DestinationDetailPage> {
                               children: [
                                 GestureDetector(
                                   onTap: () {
-                                    // Update the main image with the initial image
                                     setState(() {
                                       widget.destination["image"] = initialImage;
                                     });
@@ -135,7 +143,6 @@ class _DestinationDetailPageState extends State<DestinationDetailPage> {
                                 ...List.generate(5, (index) {
                                   return GestureDetector(
                                     onTap: () {
-                                      // Update the main image with the selected image
                                       setState(() {
                                         widget.destination["image"] = AssetImage('image/list${index + 1}.png');
                                       });
@@ -162,11 +169,36 @@ class _DestinationDetailPageState extends State<DestinationDetailPage> {
                             children: [
                               Icon(Icons.star, color: Colors.orange, size: 16),
                               SizedBox(width: 4),
-                              Text("${widget.destination["rating"] ?? 0} (${widget.destination["reviews"] ?? 0})",
-                                  style: TextStyle(fontSize: 14)),
+                              Text(
+                                "${widget.destination["rating"] ?? 0} (${widget.destination["reviews"] ?? 0})",
+                                style: TextStyle(fontSize: 14),
+                              ),
                               Spacer(),
-                              Text("${widget.destination["price"] ?? 'N/A'}",
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue)),
+                              Text(
+                                "\$${widget.destination["price"] ?? 'N/A'}",
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue),
+                              ),
+                            ],
+                          ),SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Icon(Icons.calendar_today, size: 16, color: Colors.black),
+                              SizedBox(width: 4),
+                              Text(
+                                "Start: ${widget.destination["startDate"] ?? "N/A"}",
+                                style: TextStyle(fontSize: 14, color: Colors.black),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 5),
+                          Row(
+                            children: [
+                              Icon(Icons.calendar_today_outlined, size: 16, color: Colors.black),
+                              SizedBox(width: 4),
+                              Text(
+                                "End: ${widget.destination["endDate"] ?? "N/A"}",
+                                style: TextStyle(fontSize: 14, color: Colors.black),
+                              ),
                             ],
                           ),
                           SizedBox(height: 10),
@@ -181,6 +213,7 @@ class _DestinationDetailPageState extends State<DestinationDetailPage> {
                             maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                           ),
+                          
                           SizedBox(height: 10),
                         ],
                       ),
@@ -200,10 +233,11 @@ class _DestinationDetailPageState extends State<DestinationDetailPage> {
                           minimumSize: Size(double.infinity, 50),
                         ),
                         onPressed: () {
-                          // Navigate to the tour schedule page
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => TourSchedulePage()),
+                            MaterialPageRoute(
+                                builder: (context) =>
+                                    TourSchedulePage(destination: widget.destination)),
                           );
                         },
                         child: Text("View Tour Schedule", style: TextStyle(fontSize: 18, color: Colors.white)),
@@ -217,7 +251,14 @@ class _DestinationDetailPageState extends State<DestinationDetailPage> {
                           ),
                           minimumSize: Size(double.infinity, 50),
                         ),
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) =>
+                                    BookingNowPage()),
+                          );
+                        },
                         child: Text("Book Now", style: TextStyle(fontSize: 18, color: Colors.white)),
                       ),
                     ],

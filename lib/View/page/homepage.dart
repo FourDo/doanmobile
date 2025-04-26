@@ -1,41 +1,62 @@
-import 'package:doanngon/View/page/CalendarScreen.dart';
+import 'package:doanngon/Bloc/bookingnow_bloc.dart';
+import 'package:doanngon/Bloc/favorite_bloc.dart';
 import 'package:doanngon/View/page/DestinationPage.dart';
+import 'package:doanngon/View/page/FavoriteScreen.dart';
 import 'package:doanngon/View/page/TicketScreen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:doanngon/bloc/home_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:doanngon/Repository/listtour.dart';
+import 'package:doanngon/Model/tour.dart';
 
 import 'ProfileScreen.dart';
 import 'SearchScreen.dart';
 
 class FullAppPage extends StatelessWidget {
-  const FullAppPage({super.key});
+  final List<List<Map<String, String>>> bookings;
+
+  const FullAppPage({super.key, this.bookings = const []});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => HomeBloc(),
-      child: FullAppView(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (context) => HomeBloc()),
+        BlocProvider(create: (context) => FavoriteBloc()), 
+        BlocProvider(create: (context) => BookingBloc()),
+      ],
+      child: FullAppView(bookings: bookings),
     );
   }
 }
 
 class FullAppView extends StatefulWidget {
-  const FullAppView({super.key});
+  final List<List<Map<String, String>>> bookings;
+
+  const FullAppView({super.key, required this.bookings});
 
   @override
   State<FullAppView> createState() => _FullAppViewState();
 }
 
 class _FullAppViewState extends State<FullAppView> {
-  List<Widget> pages = [
-    const HomeScreen(),
-    const CalendarScreen(),
-    const SearchScreen(),
-    const TicketScreen(),
-    const ProfileScreen(),
-  ];
+  late List<Widget> pages;
+
+  @override
+  void initState() {
+    super.initState();
+    pages = [
+      const HomeScreen(),
+      BlocProvider.value(
+        value: context.read<HomeBloc>(), 
+        child: const FavoriteScreen(),
+      ),
+      const SearchScreen(),
+      TicketScreen(bookings: widget.bookings),
+      const ProfileScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,14 +82,14 @@ class _FullAppViewState extends State<FullAppView> {
             items: const [
               BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
               BottomNavigationBarItem(
-                  icon: Icon(FontAwesomeIcons.heart), label: 'Favorites'),
+                  icon: Icon(Icons.favorite), label: 'Calendar'),
               BottomNavigationBarItem(
                   icon: CircleAvatar(
                       backgroundColor: Colors.blue,
                       child: Icon(Icons.search, color: Colors.white)),
                   label: ''),
               BottomNavigationBarItem(
-                  icon: Icon(Icons.airplane_ticket), label: 'Messages'),
+                  icon: Icon(Icons.message_outlined), label: 'Messages'),
               BottomNavigationBarItem(
                   icon: Icon(Icons.person_outline), label: 'Profile'),
             ],
@@ -86,26 +107,38 @@ class HomeScreen extends StatefulWidget {
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
-final List<Map<String, dynamic>> destinations = [
-  {
-    "title": "Niladri Reservoir",
-    "location": "Tekergat, Sunamgnj",
-    "rating": 4.7,
-    "image": AssetImage('image/Rectangle27.png'),
-  },
-  {
-    "title": "Darmas Park",
-    "location": "Darmas, City",
-    "rating": 4.5,
-    "image": AssetImage('image/Rectangle34.png'),
-  },
-
-];
 
 class _HomeScreenState extends State<HomeScreen> {
+  late Future<List<Map<String, dynamic>>> destinationsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    destinationsFuture = fetchDestinations();
+  }
+
+  Future<List<Map<String, dynamic>>> fetchDestinations() async {
+    final tourRepository = TourRepository();
+    final tours = await tourRepository.fetchTours();
+    return tours.map((tour) {
+      return {
+        'id': tour.id,
+        "title": tour.name,
+        "destination": tour.destination,
+        "description": tour.description,
+        "price": tour.price,
+        "startDate": "${tour.startDate.toLocal()}".split(' ')[0],
+        "endDate": "${tour.endDate.toLocal()}".split(' ')[0],
+        "location": tour.destination,
+        "rating": 4.5, // Default rating
+        "image": AssetImage(tour.imageUrl), // Use AssetImage for local assets
+      };
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return  Scaffold(
+    return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -155,55 +188,82 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      body: Column(crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: 20,)
-            ,Padding(padding: EdgeInsets.all(10),child:
-            RichText(text:TextSpan(
-                style: TextStyle(fontSize: 38, fontWeight: FontWeight.w400, color: Colors.black),
-                children: [
-                  TextSpan(text: "Explore the\n"),
-                  TextSpan(
-                    text: "Beautiful ",
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: destinationsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Failed to load destinations'));
+          } else {
+            final destinations = snapshot.data!;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: 20),
+                Padding(
+                  padding: EdgeInsets.all(10),
+                  child: RichText(
+                    text: TextSpan(
+                      style: TextStyle(
+                          fontSize: 38,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.black),
+                      children: [
+                        TextSpan(text: "Explore the\n"),
+                        TextSpan(
+                          text: "Beautiful ",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, color: Colors.black),
+                        ),
+                        TextSpan(
+                          text: "world!",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, color: Colors.orange),
+                        ),
+                      ],
+                    ),
                   ),
-                  TextSpan(
-                    text: "world!",
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+                ),
+                SizedBox(height: 120),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Best Destination",
+                        style: TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      TextButton(
+                        onPressed: () {},
+                        child: Text("View all",
+                            style: TextStyle(color: Colors.blue)),
+                      ),
+                    ],
                   ),
-                ],)
-            ,),
-            ),
-            SizedBox(height: 120,),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10), // Đẩy vào hai bên
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "Best Destination",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 10),
+                Container(
+                  height: 350,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: destinations.length,
+                    itemBuilder: (context, index) {
+                      final destination = destinations[index];
+                      return DestinationCard(destination: destination);
+                    },
                   ),
-                  TextButton(
-                    onPressed: () {},
-                    child: Text("View all", style: TextStyle(color: Colors.blue)),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 10,),
-            Container(height: 350,
-            child: ListView.builder(scrollDirection: Axis.horizontal,itemCount: destinations.length,itemBuilder: (context,index){
-              final destination = destinations[index];
-              return  DestinationCard(destination: destination);
-            },),
-            )
-    ]
-      ));
+                ),
+              ],
+            );
+          }
+        },
+      ),
+    );
   }
 }
-
-
 
 class DestinationCard extends StatefulWidget {
   final Map<String, dynamic> destination;
@@ -222,7 +282,9 @@ class _DestinationCardState extends State<DestinationCard> {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => DestinationDetailPage(destination: widget.destination)),
+          MaterialPageRoute(
+              builder: (context) =>
+                  DestinationDetailPage(destination: widget.destination)),
         );
       },
       child: Container(
@@ -231,60 +293,80 @@ class _DestinationCardState extends State<DestinationCard> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6, spreadRadius: 1)],
+          boxShadow: [
+            BoxShadow(color: Colors.black12, blurRadius: 6, spreadRadius: 1)
+          ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            Stack(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                  child: Image(
-                    image: widget.destination["image"],
-                    height: 260,
-                    width: 300,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.white,
-                    child: IconButton(
-                      icon: FaIcon(
-                        FontAwesomeIcons.heart,
-                        color: isFavorite ? Colors.red : Colors.grey,
-
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(16)),
+                      child: Image(
+                        image: widget.destination["image"],
+                        height: 280,
+                        width: 300,
+                        fit: BoxFit.cover,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          isFavorite = !isFavorite;
-                        });
-                      },
                     ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.white,
+                        child: IconButton(
+                          icon: Icon(
+                            isFavorite ? Icons.favorite : Icons.favorite_border,
+                            color: isFavorite ? Colors.red : Colors.grey,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              isFavorite = !isFavorite;
+                            });
+                            if (isFavorite) {
+                              context
+                                  .read<FavoriteBloc>()
+                                  .add(AddFavorite(widget.destination));
+                            } else {
+                              context
+                                  .read<FavoriteBloc>()
+                                  .add(RemoveFavorite(widget.destination));
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.destination["title"],
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold)),
+                      SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on,
+                              size: 14, color: Colors.grey),
+                          SizedBox(width: 4),
+                          Text(widget.destination["location"],
+                              style:
+                                  TextStyle(color: Colors.grey, fontSize: 12)),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                    ],
                   ),
                 ),
               ],
-            ),
-            Padding(
-              padding: EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(widget.destination["title"], style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.location_on, size: 14, color: Colors.grey),
-                      SizedBox(width: 4),
-                      Text(widget.destination["location"], style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    ],
-                  ),
-                  SizedBox(height: 8),
-                ],
-              ),
             ),
           ],
         ),
@@ -292,4 +374,3 @@ class _DestinationCardState extends State<DestinationCard> {
     );
   }
 }
-
